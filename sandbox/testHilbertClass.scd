@@ -189,7 +189,8 @@ var overSample, start;
 size = 2048;
 overSample = 8;
 // plot: jump to the 5th cycle, offset further to account for the delay of Convolution2
-start = 5 * size + (((size - 1) / 2).floor).asInt + size - s.options.blockSize;  // offset - to sync cycle
+// start = 5 * size + (((size - 1) / 2).floor).asInt + size - s.options.blockSize;  // offset - to sync cycle
+start = 5 * size + ((size/ 2).floor).asInt + size - s.options.blockSize;  // offset - to sync cycle, for kernel normalized to sample delay
 
 dur = size / s.sampleRate;  // in seconds
 freq = dur.reciprocal;
