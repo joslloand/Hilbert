@@ -1,4 +1,50 @@
 /*
+
+FFT analysis
+
+NOTE: FFT returns linear frequency
+
+*/
+(
+~calcMag = { arg kernel;
+
+	var fftResponse, fftMag;
+
+	// FFT analysis here!
+	fftResponse = fft(
+		kernel.as(Signal),
+		Signal.newClear(kernel.size),
+		Signal.fftCosTable(kernel.size)
+	);
+
+	// find (& trim magnitude)
+	fftMag = fftResponse.magnitude;
+	fftMag = fftMag.copyFromStart((kernel.size/2).asInteger);
+
+	fftMag;
+};
+
+
+~calcPha = { arg kernel;
+
+	var fftResponse, fftPha;
+
+	// FFT analysis here!
+	fftResponse = fft(
+		kernel.as(Signal),
+		Signal.newClear(kernel.size),
+		Signal.fftCosTable(kernel.size)
+	);
+
+	// find (& trim phase)
+	fftPha = fftResponse.phase;
+	fftPha = fftPha.copyFromStart((kernel.size/2).asInteger);
+
+	fftPha;
+};
+)
+
+/*
 		TEST Weaver : HilbertWRe, HilbertWIm, HilbertW
 */
 
@@ -189,7 +235,6 @@ var overSample, start;
 size = 2048;
 overSample = 8;
 // plot: jump to the 5th cycle, offset further to account for the delay of Convolution2
-// start = 5 * size + (((size - 1) / 2).floor).asInt + size - s.options.blockSize;  // offset - to sync cycle
 start = 5 * size + ((size/ 2).floor).asInt + size - s.options.blockSize;  // offset - to sync cycle, for kernel normalized to sample delay
 
 dur = size / s.sampleRate;  // in seconds
@@ -275,6 +320,58 @@ fork {
 }
 )
 
+// TEST Hartley - Coefficients
+(
+var size;
+var realCoeffs, imagCoeffs;
+var plotDbMin, plotDbMax, plotDegMin, plotDegMax;
+
+// kernel size
+size = 2048;
+
+// plot params
+plotDbMin = -60.0;
+plotDbMax = 6.0;
+plotDegMin = 0.0;
+plotDegMax = 180.0;
+
+
+// calculate coefficients
+realCoeffs = HilbertH.calcRealCoeffs(size);
+imagCoeffs = HilbertH.calcImagCoeffs(size);
+
+// plot coefficients
+[realCoeffs, imagCoeffs].plot(
+	name: "Real & Imag Coefficients",
+	minval: -1,
+	maxval: 1
+);
+
+
+// plot - magnitude
+
+// real & imag
+[~calcMag.value(realCoeffs), ~calcMag.value(imagCoeffs)].ampdb.plot(
+	name: "Real & Imag Magnitude Response",
+	minval: plotDbMin,
+	maxval: plotDbMax
+);
+
+// system
+((Complex.new(~calcMag.value(~realCoeffs), ~calcMag.value(~imagCoeffs)).magnitude  / 2.sqrt).ampdb).plot(
+	name: "System Magnitude Response",
+	minval: plotDbMin,
+	maxval: plotDbMax
+);
+
+// plot - phase difference
+(~calcPha.value(realCoeffs) - ~calcPha.value(imagCoeffs)).raddeg.plot(
+	name: "System Phase Difference",
+	minval: plotDegMin,
+	maxval: plotDegMax
+);
+
+)
 
 
 // quick benchmark - late 2016 Macbook Pro
