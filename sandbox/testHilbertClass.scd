@@ -42,6 +42,22 @@ NOTE: FFT returns linear frequency
 
 	fftPha;
 };
+
+// // "https://github.com/supercollider-quarks/wslib/blob/master/wslib-classes/Extensions/Collection/extCollection-unwrap.sc"
+// ~unwrap = { |lo = -1, hi = 1|
+//
+// 	var last;
+//
+// 	last = this[0];
+// 	[last] ++ this[1..].collect({ |item|
+// 		var out;
+// 		out = item.wrap( last + lo, last + hi );
+// 		last = out;
+// 		out;
+// 	});
+// }
+
+
 )
 
 /*
@@ -377,6 +393,181 @@ fork {
 	);
 }
 )
+
+// TEST PDN - IR
+(
+var size, dur, freq;
+var overSample, start;
+var realCoeffs, imagCoeffs;
+var plotDbMin, plotDbMax, plotDegMin, plotDegMax;
+
+// kernel size
+size = 2048;
+
+overSample = 2;
+
+// plot params
+plotDbMin = -60.0;
+plotDbMax = 6.0;
+// plotDegMin = 0.0;
+// plotDegMax = 180.0;
+plotDegMin = nil;
+plotDegMax = nil;
+
+start = 0;  // offset - for kernel normalized to sample delay
+
+dur = size / s.sampleRate;  // in seconds
+freq = dur.reciprocal;
+
+fork {
+	{ // real
+		HilbertPDNRe.ar(
+			Impulse.ar(freq) // imulse test, one pulse over fftbuffer size
+		);
+	}.loadToFloatArray(overSample * dur, s, {
+		|arr|
+		defer {
+			arr = arr.copyRange(start, start+size-1);
+			arr.plot("Real; HilbertPDNRe; Impulse input", minval: -1, maxval: 1);
+		}
+		}
+	);
+
+	0.5.wait;
+
+	{ // imaginary
+		HilbertPDNIm.ar(
+			Impulse.ar(freq), // imulse test, one pulse over fftbuffer size
+		);
+	}.loadToFloatArray(overSample * dur, s, {
+		|arr|
+		defer {
+			arr = arr.copyRange(start, start+size-1);
+			arr.plot("Imag; HilbertPDNIm; Impulse input", minval: -1, maxval: 1);
+		}
+		}
+	);
+
+	0.5.wait;
+
+	{ // [real,imag]
+		HilbertPDN.ar2( // aggregating HilbertPDNRe and HilbertPDNIm
+			Impulse.ar(freq), // imulse test, one pulse over fftbuffer size
+		);
+	}.loadToFloatArray(overSample * dur, s, {
+		|arr|
+		defer {
+			arr = arr.clump(2).flop; // de-interleave
+			arr = arr.collect(_.copyRange(start, start+size-1));
+			arr.plot("[real, imag]; HilbertPDN; Impulse input", minval: -1, maxval: 1);
+		}
+		}
+	);
+
+	0.5.wait;
+
+	{ // plot magnitude - real
+		HilbertPDNRe.ar( // real
+			Impulse.ar(freq), // imulse test, one pulse over fftbuffer size
+		);
+	}.loadToFloatArray(overSample * dur, s, {
+		|arr|
+		defer {
+			arr = arr.copyRange(start, start+size-1);
+			~calcMag.value(arr).ampdb.plot(
+				name: "Real Magnitude Response",
+				minval: plotDbMin,
+				maxval: plotDbMax
+			);
+		}
+		}
+	);
+
+	0.5.wait;
+
+	{ // plot magnitude - imag
+		HilbertPDNIm.ar( // imag
+			Impulse.ar(freq), // imulse test, one pulse over fftbuffer size
+		);
+	}.loadToFloatArray(overSample * dur, s, {
+		|arr|
+		defer {
+			arr = arr.copyRange(start, start+size-1);
+			~calcMag.value(arr).ampdb.plot(
+				name: "Imag Magnitude Response",
+				minval: plotDbMin,
+				maxval: plotDbMax
+			);
+		}
+		}
+	);
+
+	0.5.wait;
+
+	{ // plot magnitude - [real,imag]
+		HilbertPDN.ar2( // aggregating HilbertPDNRe and HilbertPDNIm
+			Impulse.ar(freq), // imulse test, one pulse over fftbuffer size
+		);
+	}.loadToFloatArray(overSample * dur, s, {
+		|arr|
+		defer {
+			arr = arr.clump(2).flop; // de-interleave
+			arr = arr.collect(_.copyRange(start, start+size-1));
+			[~calcMag.value(arr.at(0)), ~calcMag.value(arr.at(1))].ampdb.plot(
+				name: "Real & Imag Magnitude Response",
+				minval: plotDbMin,
+				maxval: plotDbMax
+			);
+		}
+		}
+	);
+
+	0.5.wait;
+
+	{ // plot magnitude - system
+		HilbertPDN.ar2( // aggregating HilbertPDNRe and HilbertPDNIm
+			Impulse.ar(freq), // imulse test, one pulse over fftbuffer size
+		);
+	}.loadToFloatArray(overSample * dur, s, {
+		|arr|
+		defer {
+			arr = arr.clump(2).flop; // de-interleave
+			arr = arr.collect(_.copyRange(start, start+size-1));
+			((Complex.new(~calcMag.value(arr.at(0)), ~calcMag.value(arr.at(1))).magnitude  / 2.sqrt).ampdb).plot(
+				name: "System Magnitude Response",
+				minval: plotDbMin,
+				maxval: plotDbMax
+			);
+		}
+		}
+	);
+
+	0.5.wait;
+
+	{ // plot phase difference - system
+		HilbertPDN.ar2( // aggregating HilbertPDNRe and HilbertPDNIm
+			Impulse.ar(freq), // imulse test, one pulse over fftbuffer size
+		);
+	}.loadToFloatArray(overSample * dur, s, {
+		|arr|
+		defer {
+			arr = arr.clump(2).flop; // de-interleave
+			arr = arr.collect(_.copyRange(start, start+size-1));
+			// (~calcPha.value(arr.at(0)) - ~calcPha.value(arr.at(1))).raddeg.plot(
+			(~calcPha.value(arr.at(1)) - ~calcPha.value(arr.at(0))).raddeg.plot( // reversed... which is correct!
+				name: "System Phase Difference",
+				minval: plotDegMin,
+				maxval: plotDegMax
+			);
+		}
+		}
+	);
+
+	0.5.wait;
+
+}
+)
+
 
 // quick benchmark - late 2016 Macbook Pro
 ~bus = CtkAudio.play(2);
