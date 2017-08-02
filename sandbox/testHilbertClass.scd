@@ -422,7 +422,7 @@ freq = dur.reciprocal;
 fork {
 	{ // real
 		HilbertPDNRe.ar(
-			Impulse.ar(freq) // imulse test, one pulse over fftbuffer size
+			Impulse.ar(freq, 0.5) // imulse test, one pulse over fftbuffer size
 		);
 	}.loadToFloatArray(overSample * dur, s, {
 		|arr|
@@ -437,7 +437,7 @@ fork {
 
 	{ // imaginary
 		HilbertPDNIm.ar(
-			Impulse.ar(freq), // imulse test, one pulse over fftbuffer size
+			Impulse.ar(freq, 0.5), // imulse test, one pulse over fftbuffer size
 		);
 	}.loadToFloatArray(overSample * dur, s, {
 		|arr|
@@ -452,7 +452,7 @@ fork {
 
 	{ // [real,imag]
 		HilbertPDN.ar2( // aggregating HilbertPDNRe and HilbertPDNIm
-			Impulse.ar(freq), // imulse test, one pulse over fftbuffer size
+			Impulse.ar(freq, 0.5), // imulse test, one pulse over fftbuffer size
 		);
 	}.loadToFloatArray(overSample * dur, s, {
 		|arr|
@@ -468,7 +468,7 @@ fork {
 
 	{ // plot magnitude - real
 		HilbertPDNRe.ar( // real
-			Impulse.ar(freq), // imulse test, one pulse over fftbuffer size
+			Impulse.ar(freq, 0.5), // imulse test, one pulse over fftbuffer size
 		);
 	}.loadToFloatArray(overSample * dur, s, {
 		|arr|
@@ -487,7 +487,7 @@ fork {
 
 	{ // plot magnitude - imag
 		HilbertPDNIm.ar( // imag
-			Impulse.ar(freq), // imulse test, one pulse over fftbuffer size
+			Impulse.ar(freq, 0.5), // imulse test, one pulse over fftbuffer size
 		);
 	}.loadToFloatArray(overSample * dur, s, {
 		|arr|
@@ -506,7 +506,7 @@ fork {
 
 	{ // plot magnitude - [real,imag]
 		HilbertPDN.ar2( // aggregating HilbertPDNRe and HilbertPDNIm
-			Impulse.ar(freq), // imulse test, one pulse over fftbuffer size
+			Impulse.ar(freq, 0.5), // imulse test, one pulse over fftbuffer size
 		);
 	}.loadToFloatArray(overSample * dur, s, {
 		|arr|
@@ -526,7 +526,7 @@ fork {
 
 	{ // plot magnitude - system
 		HilbertPDN.ar2( // aggregating HilbertPDNRe and HilbertPDNIm
-			Impulse.ar(freq), // imulse test, one pulse over fftbuffer size
+			Impulse.ar(freq, 0.5), // imulse test, one pulse over fftbuffer size
 		);
 	}.loadToFloatArray(overSample * dur, s, {
 		|arr|
@@ -546,15 +546,15 @@ fork {
 
 	{ // plot phase difference - system
 		HilbertPDN.ar2( // aggregating HilbertPDNRe and HilbertPDNIm
-			Impulse.ar(freq), // imulse test, one pulse over fftbuffer size
+			Impulse.ar(freq, 0.5), // imulse test, one pulse over fftbuffer size
 		);
 	}.loadToFloatArray(overSample * dur, s, {
 		|arr|
 		defer {
 			arr = arr.clump(2).flop; // de-interleave
 			arr = arr.collect(_.copyRange(start, start+size-1));
-			// (~calcPha.value(arr.at(0)) - ~calcPha.value(arr.at(1))).raddeg.plot(
-			(~calcPha.value(arr.at(1)) - ~calcPha.value(arr.at(0))).raddeg.plot( // reversed... which is correct!
+			(~calcPha.value(arr.at(0)) - ~calcPha.value(arr.at(1))).raddeg.plot(
+			// (~calcPha.value(arr.at(1)) - ~calcPha.value(arr.at(0))).raddeg.plot( // reversed... which is correct!
 				name: "System Phase Difference",
 				minval: plotDegMin,
 				maxval: plotDegMax
