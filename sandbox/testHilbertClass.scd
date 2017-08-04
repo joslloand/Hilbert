@@ -62,6 +62,8 @@ NOTE: FFT returns linear frequency
 
 /*
 		TEST Weaver : HilbertWRe, HilbertWIm, HilbertW
+
+		single cosine cycle: period = size
 */
 
 (
@@ -69,8 +71,9 @@ var size, dur, freq;
 var overSample, start;
 
 size = 2048;
-overSample = 8;
-start = 7 * size - s.options.blockSize;  // offset - to sync cycle
+overSample = 3;
+// plot: jump to the 2nd cycle, to account for "warm up" of Im kernel
+start = 2 * size - s.options.blockSize;  // offset - to sync cycle
 
 dur = size / s.sampleRate;  // in seconds
 freq = dur.reciprocal;
@@ -116,7 +119,11 @@ freq = dur.reciprocal;
 );
 )
 
-// TEST Weaver - IR
+/*
+		TEST Weaver
+
+		Impulse Response
+*/
 (
 var size, dur, freq;
 var overSample, start;
@@ -134,7 +141,7 @@ plotDbMax = 6.0;
 plotDegMin = 0.0;
 plotDegMax = 180.0;
 
-start = size  - ((size/2).asInt)- s.options.blockSize;  // offset - for kernel normalized to sample delay
+start = size  - ((size/2).asInt) - s.options.blockSize;  // offset - for kernel normalized to sample delay
 
 dur = size / s.sampleRate;  // in seconds
 freq = dur.reciprocal;
@@ -321,285 +328,21 @@ d[\hilbertWRe].note().outbus_(~bus.busnum).play
 d[\hilbertWIm].note().outbus_(~bus.busnum).play
 
 
-/*
-			TEST PDN : HilbertPDN.ar (FOS), HilbertPDN.ar1 (SOS), HilbertPDN.ar2 (SOS, refactored)
-*/
-
-// TODO:
-// it appears the sin/cos parts are reversed or the imaginary part has its phase inverted
-// magnitude response not so great at high freqs... especially the FOS version
-(
-fork {
-	var dur, freq, period;
-	var overSample, plotstartcycle, start, plotdur, plotcycles;
-
-	// freq = s.sampleRate/2; // nyquist
-	freq = s.sampleRate/4; // half nyquist
-	freq = s.sampleRate/3;
-	freq = s.sampleRate/5;
-	// freq = 4000;
-	period = freq.reciprocal;
-	overSample = 50; // how many cycles to capture
-	plotstartcycle = 1;
-	plotcycles = 25;
-	start = (plotstartcycle * period * s.sampleRate).asInt -1;  // offset - to sync cycle, start of plot
-	dur = period * overSample;  // duration of capture, in seconds
-	plotdur = (period * s.sampleRate).asInt * plotcycles;
-
-	{ // [real,imag]
-		HilbertPDN.ar(
-			SinOsc.ar(freq, pi/2), // cosine test, one cycle over fftbuffer size
-		);
-	}.loadToFloatArray(dur, s, {
-		|arr|
-		defer {
-			arr = arr.clump(2).flop; // de-interleave
-			arr = arr.collect(_.copyRange(start, start+plotdur));
-			arr.plot(format("[real, imag]; HilbertPDN.ar (FOS); Cosine input % Hz", freq), minval: -1, maxval: 1);
-		}
-	}
-	);
-
-	0.5.wait;
-
-	{ // [real,imag]
-		HilbertPDN.ar1(
-			SinOsc.ar(freq, pi/2), // cosine test, one cycle over fftbuffer size
-		);
-	}.loadToFloatArray(dur, s, {
-		|arr|
-		defer {
-			arr = arr.clump(2).flop; // de-interleave
-			arr = arr.collect(_.copyRange(start, start+plotdur));
-			arr.plot(format("[real, imag]; HilbertPDN.ar1 (SOS); Cosine input % Hz", freq), minval: -1, maxval: 1);
-		}
-	}
-	);
-
-	0.5.wait;
-
-	{ // [real,imag]
-		HilbertPDN.ar2(
-			SinOsc.ar(freq, pi/2), // cosine test, one cycle over fftbuffer size
-		);
-	}.loadToFloatArray(dur, s, {
-		|arr|
-		defer {
-			arr = arr.clump(2).flop; // de-interleave
-			arr = arr.collect(_.copyRange(start, start+plotdur));
-			arr.plot(format("[real, imag]; HilbertPDN.ar2 (SOS-refactored); Cosine input % Hz", freq), minval: -1, maxval: 1);
-		}
-		}
-	);
-}
-)
-
-// TEST PDN - IR
-(
-var size, dur, freq;
-var overSample, start;
-var realCoeffs, imagCoeffs;
-var plotDbMin, plotDbMax, plotDegMin, plotDegMax;
-
-// kernel size
-size = 2048;
-
-overSample = 2;
-
-// plot params
-plotDbMin = -60.0;
-plotDbMax = 6.0;
-// plotDegMin = 0.0;
-// plotDegMax = 180.0;
-plotDegMin = nil;
-plotDegMax = nil;
-
-start = 0;  // offset - for kernel normalized to sample delay
-
-dur = size / s.sampleRate;  // in seconds
-freq = dur.reciprocal;
-
-fork {
-	{ // real
-		HilbertPDNRe.ar(
-			Impulse.ar(freq, 0.5) // imulse test, one pulse over fftbuffer size
-		);
-	}.loadToFloatArray(overSample * dur, s, {
-		|arr|
-		defer {
-			arr = arr.copyRange(start, start+size-1);
-			arr.plot("Real; HilbertPDNRe; Impulse input", minval: -1, maxval: 1);
-		}
-		}
-	);
-
-	0.5.wait;
-
-	{ // imaginary
-		HilbertPDNIm.ar(
-			Impulse.ar(freq, 0.5), // imulse test, one pulse over fftbuffer size
-		);
-	}.loadToFloatArray(overSample * dur, s, {
-		|arr|
-		defer {
-			arr = arr.copyRange(start, start+size-1);
-			arr.plot("Imag; HilbertPDNIm; Impulse input", minval: -1, maxval: 1);
-		}
-		}
-	);
-
-	0.5.wait;
-
-	{ // [real,imag]
-		HilbertPDN.ar2( // aggregating HilbertPDNRe and HilbertPDNIm
-			Impulse.ar(freq, 0.5), // imulse test, one pulse over fftbuffer size
-		);
-	}.loadToFloatArray(overSample * dur, s, {
-		|arr|
-		defer {
-			arr = arr.clump(2).flop; // de-interleave
-			arr = arr.collect(_.copyRange(start, start+size-1));
-			arr.plot("[real, imag]; HilbertPDN; Impulse input", minval: -1, maxval: 1);
-		}
-		}
-	);
-
-	0.5.wait;
-
-	{ // plot magnitude - real
-		HilbertPDNRe.ar( // real
-			Impulse.ar(freq, 0.5), // imulse test, one pulse over fftbuffer size
-		);
-	}.loadToFloatArray(overSample * dur, s, {
-		|arr|
-		defer {
-			arr = arr.copyRange(start, start+size-1);
-			~calcMag.value(arr).ampdb.plot(
-				name: "Real Magnitude Response",
-				minval: plotDbMin,
-				maxval: plotDbMax
-			);
-		}
-		}
-	);
-
-	0.5.wait;
-
-	{ // plot magnitude - imag
-		HilbertPDNIm.ar( // imag
-			Impulse.ar(freq, 0.5), // imulse test, one pulse over fftbuffer size
-		);
-	}.loadToFloatArray(overSample * dur, s, {
-		|arr|
-		defer {
-			arr = arr.copyRange(start, start+size-1);
-			~calcMag.value(arr).ampdb.plot(
-				name: "Imag Magnitude Response",
-				minval: plotDbMin,
-				maxval: plotDbMax
-			);
-		}
-		}
-	);
-
-	0.5.wait;
-
-	{ // plot magnitude - [real,imag]
-		HilbertPDN.ar2( // aggregating HilbertPDNRe and HilbertPDNIm
-			Impulse.ar(freq, 0.5), // imulse test, one pulse over fftbuffer size
-		);
-	}.loadToFloatArray(overSample * dur, s, {
-		|arr|
-		defer {
-			arr = arr.clump(2).flop; // de-interleave
-			arr = arr.collect(_.copyRange(start, start+size-1));
-			[~calcMag.value(arr.at(0)), ~calcMag.value(arr.at(1))].ampdb.plot(
-				name: "Real & Imag Magnitude Response",
-				minval: plotDbMin,
-				maxval: plotDbMax
-			);
-		}
-		}
-	);
-
-	0.5.wait;
-
-	{ // plot magnitude - system
-		HilbertPDN.ar2( // aggregating HilbertPDNRe and HilbertPDNIm
-			Impulse.ar(freq, 0.5), // imulse test, one pulse over fftbuffer size
-		);
-	}.loadToFloatArray(overSample * dur, s, {
-		|arr|
-		defer {
-			arr = arr.clump(2).flop; // de-interleave
-			arr = arr.collect(_.copyRange(start, start+size-1));
-			((Complex.new(~calcMag.value(arr.at(0)), ~calcMag.value(arr.at(1))).magnitude  / 2.sqrt).ampdb).plot(
-				name: "System Magnitude Response",
-				minval: plotDbMin,
-				maxval: plotDbMax
-			);
-		}
-		}
-	);
-
-	0.5.wait;
-
-	{ // plot phase difference - system
-		HilbertPDN.ar2( // aggregating HilbertPDNRe and HilbertPDNIm
-			Impulse.ar(freq, 0.5), // imulse test, one pulse over fftbuffer size
-		);
-	}.loadToFloatArray(overSample * dur, s, {
-		|arr|
-		defer {
-			arr = arr.clump(2).flop; // de-interleave
-			arr = arr.collect(_.copyRange(start, start+size-1));
-			(~calcPha.value(arr.at(0)) - ~calcPha.value(arr.at(1))).raddeg.plot(
-			// (~calcPha.value(arr.at(1)) - ~calcPha.value(arr.at(0))).raddeg.plot( // reversed... which is correct!
-				name: "System Phase Difference",
-				minval: plotDegMin,
-				maxval: plotDegMax
-			);
-		}
-		}
-	);
-
-	0.5.wait;
-
-}
-)
-
-
-// quick benchmark - late 2016 Macbook Pro
-~bus = CtkAudio.play(2);
-s.scope(4, ~bus.busnum)
-// *ar, FOS: 50 instances: avg 14%, pk 19.5%
-{var num = 50; Out.ar(~bus.busnum, Mix.ar(num.collect{HilbertPDN.ar(SinOsc.ar, num.reciprocal)}))}.play
-// *ar1, SOS: 50 instances: avg 11%, pk 14.7%
-{var num = 50; Out.ar(~bus.busnum, Mix.ar(num.collect{HilbertPDN.ar1(SinOsc.ar, num.reciprocal)}))}.play
-// *ar2, SOS, refactored: 50 instances: avg 11%, pk 14.7%
-{var num = 50; Out.ar(~bus.busnum, Mix.ar(num.collect{HilbertPDN.ar2(SinOsc.ar, num.reciprocal)}))}.play
-
-// test individual Re and Im
-{var num = 50; Out.ar(~bus.busnum, Mix.ar(num.collect{HilbertPDNRe.ar(SinOsc.ar, num.reciprocal)}))}.play
-{var num = 50; Out.ar(~bus.busnum, Mix.ar(num.collect{HilbertPDNIm.ar(SinOsc.ar, num.reciprocal)}))}.play
-
-
-
 
 
 /*
 		TEST Hartley : HilbertHRe, HilbertHIm, HilbertH
-*/
 
-// TEST Hartley - single cycle sinus test
+		single cosine cycle: period = size
+*/
 (
 var size, dur, freq;
 var overSample, start;
 
 size = 2048;
-overSample = 8;
-// plot: jump to the 5th cycle, offset further to account for the delay of Convolution2
-start = 5 * size + ((size/ 2).floor).asInt + size - s.options.blockSize;  // offset - to sync cycle, for kernel normalized to sample delay
+overSample = 4;
+// plot: jump to the 2nd cycle, to account for "warm up" of Im kernel
+start = 2 * size + ((size/ 2).floor).asInt - s.options.blockSize;  // offset - to sync cycle, for kernel normalized to sample delay
 
 dur = size / s.sampleRate;  // in seconds
 freq = dur.reciprocal;
@@ -608,14 +351,14 @@ fork {
 	{ // real
 		HilbertHRe.ar(
 			SinOsc.ar(freq, pi/2), // cosine test, one cycle over fftbuffer size
-			size: size);
+		size: size);
 	}.loadToFloatArray(overSample * dur, s, {
 		|arr|
 		defer {
 			arr = arr.copyRange(start, start+size-1);
 			arr.plot("Real; HilbertHRe; Cosine input", minval: -1, maxval: 1);
 		}
-	}
+		}
 	);
 
 	0.5.wait;
@@ -623,14 +366,14 @@ fork {
 	{ // imaginary
 		HilbertHIm.ar(
 			SinOsc.ar(freq, pi/2), // cosine test, one cycle over fftbuffer size
-			size: size);
+		size: size);
 	}.loadToFloatArray(overSample * dur, s, {
 		|arr|
 		defer {
 			arr = arr.copyRange(start, start+size-1);
 			arr.plot("Imag; HilbertHIm; Cosine input", minval: -1, maxval: 1);
 		}
-	}
+		}
 	);
 
 	0.5.wait;
@@ -665,7 +408,7 @@ fork {
 			arr = arr.collect(_.copyRange(start, start+size-1));
 			arr.plot("[real (convolution), real (delayed)]; HilbertHRe; Cosine input", minval: -1, maxval: 1);
 		}
-	}
+		}
 	);
 
 	0.5.wait;
@@ -679,12 +422,16 @@ fork {
 			arr = arr.copyRange(start, start+size-1);
 			arr.plot("difference between [real (delayed), real (convolution)]");
 		}
-	}
+		}
 	);
 }
 )
 
-// TEST Hartley - Coefficients
+/*
+		TEST Hartley : HilbertH
+
+		coefficients
+*/
 (
 var size;
 var realCoeffs, imagCoeffs;
@@ -738,7 +485,12 @@ imagCoeffs = HilbertH.calcImagCoeffs(size);
 )
 
 
-// TEST Hartley - IR
+/*
+		TEST Hartley : HilbertHRe, HilbertHIm, HilbertH
+
+		Impulse Response
+*/
+
 (
 var size, dur, freq;
 var overSample, start;
@@ -976,3 +728,278 @@ p[\hilbertH].note().outbus_(~bus.busnum).play
 p[\hilbertHRe_del].note().outbus_(~bus.busnum).play
 p[\hilbertHRe_conv].note().outbus_(~bus.busnum).play
 p[\hilbertHIm].note().outbus_(~bus.busnum).play
+
+
+/*
+			TEST PDN : HilbertPDN.ar (FOS), HilbertPDN.ar1 (SOS), HilbertPDN.ar2 (SOS, refactored)
+*/
+
+// TODO:
+// magnitude response not so great at high freqs... especially the FOS version
+(
+var size, dur, freq;
+var overSample, start;
+
+size = 2048;
+// size = 512;
+// size = 128;
+// size = 32;
+// size = 8;
+
+overSample = 4;
+
+// plot: adjust "by hand":
+// 1) account for "warm up" of Re & Im
+// 2) account for non-linear phase response of PDN
+start = size + 779;  // size = 2048, sampleRate = 44100
+// start = size + 405;  // size = 512, sampleRate = 44100
+// start = 2 * size + 33;  // size = 128, sampleRate = 44100
+// start = size + 23;  // size = 32, sampleRate = 44100
+// start = size + 1;  // size = 8, sampleRate = 44100
+
+dur = size / s.sampleRate;  // in seconds
+freq = dur.reciprocal;
+
+fork {
+
+	{ // [real,imag]
+		HilbertPDN.ar(
+			SinOsc.ar(freq, pi/2) // cosine test, one cycle over fftbuffer size
+		);
+	}.loadToFloatArray(overSample * dur, s, {
+		|arr|
+		defer {
+			arr = arr.clump(2).flop; // de-interleave
+			arr = arr.collect(_.copyRange(start, start+size-1));
+			arr.plot(format("[real, imag]; HilbertPDN.ar (FOS); Cosine @ % Hz; SR: %", freq, s.sampleRate), minval: -1, maxval: 1);
+		}
+	}
+	);
+
+	0.5.wait;
+
+	{ // [real,imag]
+		HilbertPDN.ar1(
+			SinOsc.ar(freq, pi/2), // cosine test, one cycle over fftbuffer size
+		);
+	}.loadToFloatArray(overSample * dur, s, {
+		|arr|
+		defer {
+			arr = arr.clump(2).flop; // de-interleave
+			arr = arr.collect(_.copyRange(start, start+size-1));
+			arr.plot(format("[real, imag]; HilbertPDN.ar1 (SOS); Cosine @ % Hz; SR: %", freq, s.sampleRate), minval: -1, maxval: 1);
+		}
+	}
+	);
+
+	0.5.wait;
+
+	{ // [real,imag]
+		HilbertPDN.ar2(
+			SinOsc.ar(freq, pi/2), // cosine test, one cycle over fftbuffer size
+		);
+	}.loadToFloatArray(overSample * dur, s, {
+		|arr|
+		defer {
+			arr = arr.clump(2).flop; // de-interleave
+			arr = arr.collect(_.copyRange(start, start+size-1));
+			arr.plot(format("[real, imag]; HilbertPDN.ar2 (SOS-refactored); Cosine @ % Hz; SR: %", freq, s.sampleRate), minval: -1, maxval: 1);
+		}
+	}
+	);
+}
+)
+
+/*
+		TEST PDN
+
+		Impulse Response
+*/
+(
+var size, dur, freq;
+var overSample, start;
+var realCoeffs, imagCoeffs;
+var plotDbMin, plotDbMax, plotDegMin, plotDegMax;
+
+// kernel size
+size = 2048;
+
+overSample = 2;
+
+// plot params
+plotDbMin = -60.0;
+plotDbMax = 6.0;
+// plotDegMin = 0.0;
+// plotDegMax = 180.0;
+plotDegMin = nil;
+plotDegMax = nil;
+
+start = 0;  // offset - for kernel normalized to sample delay
+
+dur = size / s.sampleRate;  // in seconds
+freq = dur.reciprocal;
+
+fork {
+	{ // real
+		HilbertPDNRe.ar(
+			Impulse.ar(freq, 0.5) // imulse test, one pulse over fftbuffer size
+		);
+	}.loadToFloatArray(overSample * dur, s, {
+		|arr|
+		defer {
+			arr = arr.copyRange(start, start+size-1);
+			arr.plot("Real; HilbertPDNRe; Impulse input", minval: -1, maxval: 1);
+		}
+		}
+	);
+
+	0.5.wait;
+
+	{ // imaginary
+		HilbertPDNIm.ar(
+			Impulse.ar(freq, 0.5), // imulse test, one pulse over fftbuffer size
+		);
+	}.loadToFloatArray(overSample * dur, s, {
+		|arr|
+		defer {
+			arr = arr.copyRange(start, start+size-1);
+			arr.plot("Imag; HilbertPDNIm; Impulse input", minval: -1, maxval: 1);
+		}
+		}
+	);
+
+	0.5.wait;
+
+	{ // [real,imag]
+		HilbertPDN.ar2( // aggregating HilbertPDNRe and HilbertPDNIm
+			Impulse.ar(freq, 0.5), // imulse test, one pulse over fftbuffer size
+		);
+	}.loadToFloatArray(overSample * dur, s, {
+		|arr|
+		defer {
+			arr = arr.clump(2).flop; // de-interleave
+			arr = arr.collect(_.copyRange(start, start+size-1));
+			arr.plot("[real, imag]; HilbertPDN; Impulse input", minval: -1, maxval: 1);
+		}
+		}
+	);
+
+	0.5.wait;
+
+	{ // plot magnitude - real
+		HilbertPDNRe.ar( // real
+			Impulse.ar(freq, 0.5), // imulse test, one pulse over fftbuffer size
+		);
+	}.loadToFloatArray(overSample * dur, s, {
+		|arr|
+		defer {
+			arr = arr.copyRange(start, start+size-1);
+			~calcMag.value(arr).ampdb.plot(
+				name: "Real Magnitude Response",
+				minval: plotDbMin,
+				maxval: plotDbMax
+			);
+		}
+		}
+	);
+
+	0.5.wait;
+
+	{ // plot magnitude - imag
+		HilbertPDNIm.ar( // imag
+			Impulse.ar(freq, 0.5), // imulse test, one pulse over fftbuffer size
+		);
+	}.loadToFloatArray(overSample * dur, s, {
+		|arr|
+		defer {
+			arr = arr.copyRange(start, start+size-1);
+			~calcMag.value(arr).ampdb.plot(
+				name: "Imag Magnitude Response",
+				minval: plotDbMin,
+				maxval: plotDbMax
+			);
+		}
+		}
+	);
+
+	0.5.wait;
+
+	{ // plot magnitude - [real,imag]
+		HilbertPDN.ar2( // aggregating HilbertPDNRe and HilbertPDNIm
+			Impulse.ar(freq, 0.5), // imulse test, one pulse over fftbuffer size
+		);
+	}.loadToFloatArray(overSample * dur, s, {
+		|arr|
+		defer {
+			arr = arr.clump(2).flop; // de-interleave
+			arr = arr.collect(_.copyRange(start, start+size-1));
+			[~calcMag.value(arr.at(0)), ~calcMag.value(arr.at(1))].ampdb.plot(
+				name: "Real & Imag Magnitude Response",
+				minval: plotDbMin,
+				maxval: plotDbMax
+			);
+		}
+		}
+	);
+
+	0.5.wait;
+
+	{ // plot magnitude - system
+		HilbertPDN.ar2( // aggregating HilbertPDNRe and HilbertPDNIm
+			Impulse.ar(freq, 0.5), // imulse test, one pulse over fftbuffer size
+		);
+	}.loadToFloatArray(overSample * dur, s, {
+		|arr|
+		defer {
+			arr = arr.clump(2).flop; // de-interleave
+			arr = arr.collect(_.copyRange(start, start+size-1));
+			((Complex.new(~calcMag.value(arr.at(0)), ~calcMag.value(arr.at(1))).magnitude  / 2.sqrt).ampdb).plot(
+				name: "System Magnitude Response",
+				minval: plotDbMin,
+				maxval: plotDbMax
+			);
+		}
+		}
+	);
+
+	0.5.wait;
+
+	{ // plot phase difference - system
+		HilbertPDN.ar2( // aggregating HilbertPDNRe and HilbertPDNIm
+			Impulse.ar(freq, 0.5), // imulse test, one pulse over fftbuffer size
+		);
+	}.loadToFloatArray(overSample * dur, s, {
+		|arr|
+		defer {
+			arr = arr.clump(2).flop; // de-interleave
+			arr = arr.collect(_.copyRange(start, start+size-1));
+			(~calcPha.value(arr.at(0)) - ~calcPha.value(arr.at(1))).raddeg.plot(
+			// (~calcPha.value(arr.at(1)) - ~calcPha.value(arr.at(0))).raddeg.plot( // reversed... which is correct!
+				name: "System Phase Difference",
+				minval: plotDegMin,
+				maxval: plotDegMax
+			);
+		}
+		}
+	);
+
+	0.5.wait;
+
+}
+)
+
+
+// quick benchmark - late 2016 Macbook Pro
+~bus = CtkAudio.play(2);
+s.scope(4, ~bus.busnum)
+// *ar, FOS: 50 instances: avg 14%, pk 19.5%
+{var num = 50; Out.ar(~bus.busnum, Mix.ar(num.collect{HilbertPDN.ar(SinOsc.ar, num.reciprocal)}))}.play
+// *ar1, SOS: 50 instances: avg 11%, pk 14.7%
+{var num = 50; Out.ar(~bus.busnum, Mix.ar(num.collect{HilbertPDN.ar1(SinOsc.ar, num.reciprocal)}))}.play
+// *ar2, SOS, refactored: 50 instances: avg 11%, pk 14.7%
+{var num = 50; Out.ar(~bus.busnum, Mix.ar(num.collect{HilbertPDN.ar2(SinOsc.ar, num.reciprocal)}))}.play
+
+// test individual Re and Im
+{var num = 50; Out.ar(~bus.busnum, Mix.ar(num.collect{HilbertPDNRe.ar(SinOsc.ar, num.reciprocal)}))}.play
+{var num = 50; Out.ar(~bus.busnum, Mix.ar(num.collect{HilbertPDNIm.ar(SinOsc.ar, num.reciprocal)}))}.play
+
