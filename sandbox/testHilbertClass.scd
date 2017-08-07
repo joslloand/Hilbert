@@ -120,6 +120,97 @@ freq = dur.reciprocal;
 )
 
 /*
+		TEST Weaver : *arMag, *arPhase, *arRotate, *arShift
+
+		single cosine cycle: period = size
+*/
+
+(
+var size, dur, freq, angle, shiftFreq;
+var overSample, start;
+
+size = 2048;
+overSample = 3;
+// plot: jump to the 2nd cycle, to account for "warm up" of Im kernel
+start = 2 * size - s.options.blockSize;  // offset - to sync cycle
+
+dur = size / s.sampleRate;  // in seconds
+freq = dur.reciprocal;
+// angle = 0.0;  // in radians
+// angle = pi/2;  // in radians
+// angle = pi;  // in radians
+angle = 3pi/2;  // in radians
+
+shiftFreq = freq;  // return 2 cycles
+// shiftFreq = freq.neg;  // return DC
+
+fork {
+
+	{ // magnitude
+		HilbertW.arMag(
+			SinOsc.ar(freq, pi/2), // cosine test, one cycle over fftbuffer size
+			size: size);
+	}.loadToFloatArray(overSample * dur, s, {
+		|arr|
+		defer {
+			arr = arr.copyRange(start, start+size-1);
+			arr.plot("HilbertW *arMag; Cosine input", minval: -1, maxval: 1);
+		}
+	}
+	);
+
+	0.5.wait;
+
+	{ // phase
+		HilbertW.arPhase(
+			SinOsc.ar(freq, pi/2), // cosine test, one cycle over fftbuffer size
+			size: size);
+	}.loadToFloatArray(overSample * dur, s, {
+		|arr|
+		defer {
+			arr = arr.copyRange(start, start+size-1);
+			arr.plot("HilbertW *arPhase; Cosine input", minval: -pi, maxval: pi);
+		}
+	}
+	);
+
+	0.5.wait;
+
+	{ // phase rotation
+		HilbertW.arRotate(
+			SinOsc.ar(freq, pi/2), // cosine test, one cycle over fftbuffer size
+			angle,
+			size: size);
+	}.loadToFloatArray(overSample * dur, s, {
+		|arr|
+		defer {
+			arr = arr.copyRange(start, start+size-1);
+			arr.plot(format("HilbertW *arRotate; Angle = % degrees", angle.raddeg), minval: -1, maxval: 1);
+		}
+	}
+	);
+
+	0.5.wait;
+
+	{ // frequency shifting
+		HilbertW.arShift(
+			SinOsc.ar(freq, pi/2), // cosine test, one cycle over fftbuffer size
+			shiftFreq,
+		size: size);
+	}.loadToFloatArray(overSample * dur, s, {
+		|arr|
+		defer {
+			arr = arr.copyRange(start, start+size-1);
+			arr.plot(format("HilbertW *arShift; Freq = % Hz", shiftFreq), minval: -1, maxval: 1);
+		}
+		}
+	);
+
+}
+
+)
+
+/*
 		TEST Weaver
 
 		Impulse Response
@@ -426,6 +517,98 @@ fork {
 	);
 }
 )
+
+/*
+		TEST Hartley : *arMag, *arPhase, *arRotate, *arShift
+
+		single cosine cycle: period = size
+*/
+
+(
+var size, dur, freq, angle, shiftFreq;
+var overSample, start;
+
+size = 2048;
+overSample = 4;
+// plot: jump to the 2nd cycle, to account for "warm up" of Im kernel
+start = 2 * size + ((size/ 2).floor).asInt - s.options.blockSize;  // offset - to sync cycle, for kernel normalized to sample delay
+
+dur = size / s.sampleRate;  // in seconds
+freq = dur.reciprocal;
+// angle = 0.0;  // in radians
+// angle = pi/2;  // in radians
+// angle = pi;  // in radians
+angle = 3pi/2;  // in radians
+
+shiftFreq = freq;  // return 2 cycles
+// shiftFreq = freq.neg;  // return DC
+
+fork {
+
+	{ // magnitude
+		HilbertH.arMag(
+			SinOsc.ar(freq, pi/2), // cosine test, one cycle over fftbuffer size
+			size: size);
+	}.loadToFloatArray(overSample * dur, s, {
+		|arr|
+		defer {
+			arr = arr.copyRange(start, start+size-1);
+			arr.plot("HilbertH *arMag; Cosine input", minval: -1, maxval: 1);
+		}
+	}
+	);
+
+	0.5.wait;
+
+	{ // phase
+		HilbertH.arPhase(
+			SinOsc.ar(freq, pi/2), // cosine test, one cycle over fftbuffer size
+			size: size);
+	}.loadToFloatArray(overSample * dur, s, {
+		|arr|
+		defer {
+			arr = arr.copyRange(start, start+size-1);
+			arr.plot("HilbertH *arPhase; Cosine input", minval: -pi, maxval: pi);
+		}
+	}
+	);
+
+	0.5.wait;
+
+	{ // phase rotation
+		HilbertH.arRotate(
+			SinOsc.ar(freq, pi/2), // cosine test, one cycle over fftbuffer size
+			angle,
+			size: size);
+	}.loadToFloatArray(overSample * dur, s, {
+		|arr|
+		defer {
+			arr = arr.copyRange(start, start+size-1);
+			arr.plot(format("HilbertH *arRotate; Angle = % degrees", angle.raddeg), minval: -1, maxval: 1);
+		}
+	}
+	);
+
+	0.5.wait;
+
+	{ // frequency shifting
+		HilbertH.arShift(
+			SinOsc.ar(freq, pi/2), // cosine test, one cycle over fftbuffer size
+			shiftFreq,
+			size: size);
+	}.loadToFloatArray(overSample * dur, s, {
+		|arr|
+		defer {
+			arr = arr.copyRange(start, start+size-1);
+			arr.plot(format("HilbertH *arShift; Freq = % Hz", shiftFreq), minval: -1, maxval: 1);
+		}
+	}
+	);
+
+}
+
+)
+
 
 /*
 		TEST Hartley : HilbertH
@@ -807,6 +990,109 @@ fork {
 		}
 	);
 }
+)
+
+
+/*
+		TEST PDN : *arMag, *arPhase, *arRotate, *arShift
+
+		single cosine cycle: period = size
+*/
+
+(
+var size, dur, freq, angle, shiftFreq;
+var overSample, start;
+
+size = 2048;
+// size = 512;
+// size = 128;
+// size = 32;
+// size = 8;
+
+overSample = 4;
+
+// plot: adjust "by hand":
+// 1) account for "warm up" of Re & Im
+// 2) account for non-linear phase response of PDN
+start = size + 779;  // size = 2048, sampleRate = 44100
+// start = size + 405;  // size = 512, sampleRate = 44100
+// start = 2 * size + 33;  // size = 128, sampleRate = 44100
+// start = size + 23;  // size = 32, sampleRate = 44100
+// start = size + 1;  // size = 8, sampleRate = 44100
+
+dur = size / s.sampleRate;  // in seconds
+freq = dur.reciprocal;
+
+// angle = 0.0;  // in radians
+// angle = pi/2;  // in radians
+// angle = pi;  // in radians
+angle = 3pi/2;  // in radians
+
+// shiftFreq = freq;  // return 2 cycles
+shiftFreq = freq.neg;  // return DC - NOTE: non-linear phase is uncompensated
+
+fork {
+
+	{ // magnitude
+		HilbertPDN.arMag(
+			SinOsc.ar(freq, pi/2) // cosine test, one cycle over fftbuffer size
+		);
+	}.loadToFloatArray(overSample * dur, s, {
+		|arr|
+		defer {
+			arr = arr.copyRange(start, start+size-1);
+			arr.plot("HilbertPDN *arMag; Cosine input", minval: -1, maxval: 1);
+		}
+		}
+	);
+
+	0.5.wait;
+
+	{ // phase
+		HilbertPDN.arPhase(
+			SinOsc.ar(freq, pi/2) // cosine test, one cycle over fftbuffer size
+		);
+	}.loadToFloatArray(overSample * dur, s, {
+		|arr|
+		defer {
+			arr = arr.copyRange(start, start+size-1);
+			arr.plot("HilbertPDN *arPhase; Cosine input", minval: -pi, maxval: pi);
+		}
+		}
+	);
+
+	0.5.wait;
+
+	{ // phase rotation
+		HilbertPDN.arRotate(
+			SinOsc.ar(freq, pi/2), // cosine test, one cycle over fftbuffer size
+		angle);
+	}.loadToFloatArray(overSample * dur, s, {
+		|arr|
+		defer {
+			arr = arr.copyRange(start, start+size-1);
+			arr.plot(format("HilbertPDN *arRotate; Angle = % degrees", angle.raddeg), minval: -1, maxval: 1);
+		}
+		}
+	);
+
+	0.5.wait;
+
+	{ // frequency shifting
+		HilbertPDN.arShift(
+			SinOsc.ar(freq, pi/2), // cosine test, one cycle over fftbuffer size
+		shiftFreq);
+	}.loadToFloatArray(overSample * dur, s, {
+		|arr|
+		defer {
+			arr = arr.copyRange(start, start+size-1);
+			arr.plot(format("HilbertPDN *arShift; Freq = % Hz", shiftFreq), minval: -1, maxval: 1);
+		}
+		}
+	);
+
+}
+
 )
 
 /*
