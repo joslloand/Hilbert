@@ -193,7 +193,7 @@ fork {
 	0.5.wait;
 
 	{ // frequency shifting
-		HilbertW.arShift(
+		HilbertW.arSSB(
 			SinOsc.ar(freq, pi/2), // cosine test, one cycle over fftbuffer size
 			shiftFreq,
 		size: size);
@@ -592,7 +592,7 @@ fork {
 	0.5.wait;
 
 	{ // frequency shifting
-		HilbertH.arShift(
+		HilbertH.arSSB(
 			SinOsc.ar(freq, pi/2), // cosine test, one cycle over fftbuffer size
 			shiftFreq,
 			size: size);
@@ -1079,7 +1079,7 @@ fork {
 	0.5.wait;
 
 	{ // frequency shifting
-		HilbertPDN.arShift(
+		HilbertPDN.arSSB(
 			SinOsc.ar(freq, pi/2), // cosine test, one cycle over fftbuffer size
 		shiftFreq);
 	}.loadToFloatArray(overSample * dur, s, {
